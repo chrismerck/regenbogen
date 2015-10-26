@@ -12,10 +12,10 @@ class Regenbogen(object):
   def __init__(self):
     self._font = {}
     pygame.init()
-    self._bw = 2500
-    self._f_min = 200
-    self._samprate = 8000
-    self._pps = 100
+    self._bw = 2000
+    self._f_min = 500
+    self._samprate = 16000
+    self._pps = 50
     self._chunk = 1024
     p = pyaudio.PyAudio() 
     self._stream = p.open(format = FORMAT, 
@@ -27,7 +27,7 @@ class Regenbogen(object):
 
   def text2img(self,string):
     string = ' %s '%string
-    size = 80
+    size = 40
     color = (255,255,255)
     pos = (0,0)
     if size not in self._font:
@@ -49,12 +49,11 @@ class Regenbogen(object):
   def img2audio(self,img):
     block_size = 1024*64
 
-    dst = 'hello.wav'
-    f_dst = wave.open(dst,"w")
-    f_dst.setnchannels(1)
-    f_dst.setsampwidth(2)
-    f_dst.setframerate(self._samprate)
-    print "Writing to '%s'."%(dst)
+    #dst = 'hello.wav'
+    #f_dst = wave.open(dst,"w")
+    #f_dst.setnchannels(1)
+    #f_dst.setsampwidth(2)
+    #f_dst.setframerate(self._samprate)
 
     comp = 50.0
 
@@ -69,24 +68,26 @@ class Regenbogen(object):
     # generate sample at once
     s = 0
     data = np.zeros(self._chunk)
-    for t in np.arange(0,(pix_len-1)/float(self._pps),1.0/self._samprate):
-      i = math.floor(t*float(self._pps))
-      p = (t*float(self._pps) - i)
-      a1 = 0.5*(1+math.cos((p+1)*math.pi))
-      a2 = 1 - a1
-      x = 0
-      for j in range(pix_wide):
-        x += img[i,j] * a2 * math.sin(2*math.pi*get_freq(j)*t + theta[j])
-        x += img[i+1,j] * a1 * math.sin(2*math.pi*get_freq(j)*t + theta[j])
-      if abs(x/comp) > 1:
-        comp = abs(x)
-      data[s] = (x/comp)*65535*0.5
-      s += 1
-      if s == self._chunk:
-        s = 0
-        signal = wave.struct.pack("%dh"%(len(data)), *list(data))
-        #self._stream.write(signal)
-        f_dst.writeframes(signal)
+    T = np.arange(0,(pix_len-1)/float(self._pps),1.0/self._samprate)
+    I = np.floor(T*float(self._pps))
+    P = (T*float(self._pps) - I)
+    A1 = 0.5*(1+np.cos((P+1)*math.pi))
+    A2 = 1 - A1
+    X = np.zeros(len(T))
+    for j in range(pix_wide):
+      X += img[map(int,I),j] * A2 * np.sin(2*math.pi*get_freq(j)*T + theta[j])
+      X += img[map(lambda x: int(x+1),I),j] * A1 * np.sin(2*math.pi*get_freq(j)*T + theta[j])
+
+    # normalize
+    X = X/(np.max(np.abs(X))+0.1)*65535*0.5
+
+    s = 0
+    while s < len(X):
+      data = X[s:s+self._chunk]
+      signal = wave.struct.pack("%dh"%(len(data)), *list(data))
+      self._stream.write(signal)
+      #f_dst.writeframes(signal)
+      s += self._chunk
 
   def regenbogen(self,text,fn):
     # convert unicode to image,
@@ -142,6 +143,7 @@ class Regenbogen(object):
 
 rb = Regenbogen()
 #rb.regenbogen('Hello, World!','hello.wav')
-rb.regenbogen(' CQ CQ CQ DE KD2IMV KD2IMV K ','hello.wav')
-#rb.regenbogen('CD','')
+while True:
+  text = raw_input("Regenbogen >> ")
+  rb.regenbogen(text,'')
 
