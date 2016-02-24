@@ -63,7 +63,7 @@ class Regenbogen(object):
     t = 0
     def get_freq(j):
       # get frequency of oscillator for frequency j
-      return (pix_wide - j) / float(pix_wide) * self._bw + self._f_min
+      return j / float(pix_wide) * self._bw + self._f_min
 
     # generate sample at once
     s = 0
